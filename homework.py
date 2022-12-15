@@ -4,15 +4,18 @@ import telegram
 import os
 import requests
 import logging
+import json
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+root_logger= logging.getLogger()
+root_logger.setLevel(logging.INFO)
+handler = logging.FileHandler('main.log', 'w', 'utf-8') 
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+root_logger.addHandler(handler)
+
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM')
@@ -37,9 +40,8 @@ def chec1k_tokens():
     for var in ENV_VARS:
         try:
             var in os.environ
-        except:
-            logging.CRITICAL(f'Отсутствие обязательной переменной {var}')
-            return False
+        except Exception as critical:
+            logging.critical(f'Отсутствие обязательной переменной {var}')
 
 
 def send_message(bot, message):
@@ -50,42 +52,39 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    try:
-        homework_statuses = requests.get(ENDPOINT, headers=HEADERS, params=timestamp)
-        homework_statuses.status_code == 200
-    except requests.RequestException:
-        logging.error(f'Ошибка при запросе к основному API')
-    return homework_statuses.json()
+    api_out = requests.get(ENDPOINT, headers=HEADERS, params={'from_date': timestamp})
+    return api_out.json()
 
 def check_response(response):
-    ...
+    if response["homeworks"] == None:
+        main()
+    else:
+        return response
 
 
 def parse_status(homework):
-    ...
-
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-
+    homework_name = homework["homeworks"][0]["lesson_name"]
+    status = homework["homeworks"][0]["status"]
+    verdict = HOMEWORK_VERDICTS[status]
+    return(f'Изменился статус проверки работы "{homework_name}". {verdict}')
 
 def main():
     """Основная логика работы бота."""
-    chec1k_tokens()
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    get_api_answer(timestamp)
-    send_message(bot, parse_status())
-
-    ...
 
     while True:
         try:
-            response = get_api_answer(timestamp)
-
-            time.sleep(10.0)
+            chec1k_tokens()
+            get_api = get_api_answer(timestamp)
+            response = check_response(get_api)
+            maseg = parse_status(response)
+            send_message(bot, maseg)
+            time.sleep(RETRY_PERIOD)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
-            time.sleep(10.0)
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
