@@ -74,7 +74,9 @@ def check_response(response):
     if 'homeworks' not in response:
         raise KeyError('Нет ключа "homeworks" ')
     if not isinstance(response['homeworks'], list):
-        raise TypeError('asd')
+        raise TypeError(
+            'Ошибка типа данных "homeworks" не содержит список'
+        )
     if not response['homeworks']:
         return False
     return response['homeworks'][0]
@@ -83,11 +85,13 @@ def check_response(response):
 def parse_status(homework):
     """Оброботка и передача статуса проекта."""
     if 'homework_name' not in homework:
-        raise KeyError('asd')
+        raise KeyError(
+            'Переменная "homework" не содержит ключ "homework_name"'
+        )
     homework_name = homework['homework_name']
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
-        raise KeyError('asd')
+        raise KeyError('Не известный статус')
     verdict = HOMEWORK_VERDICTS[status]
     return (f'Изменился статус проверки работы "{homework_name}". {verdict}')
 
