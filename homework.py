@@ -4,49 +4,38 @@ import telegram
 import os
 import requests
 import logging
+from settings.settings import RETRY_PERIOD, ENDPOINT, HOMEWORK_VERDICTS
 
 from http import HTTPStatus
 from dotenv import load_dotenv
 
 load_dotenv()
 
-root_logger = logging.getLogger(__name__)
+root_logger = logging.getLogger()
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID')
 
-RETRY_PERIOD = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
+# Не совсем понимаю как мне импортировать данную константу.
+# Не могу импортировать PRACTICUM_TOKEN в settings ругаются тесты.
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
-
-HOMEWORK_VERDICTS = {
-    'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
-    'reviewing': 'Работа взята на проверку ревьюером.',
-    'rejected': 'Работа проверена: у ревьюера есть замечания.'
-}
+# Все остальные победить смог,
+# но лиш при создании доп дериктории и файла __init_.
+# Не знаю на сколько это корректно в рамках ТЗ.
+# По этому мудрить дальше не стал.
 
 
 def check_tokens():
     """Проверяем обязательные переменные."""
-    ENV_VARS = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-    for var in ENV_VARS:
-        try:
-            var in os.environ
-        except Exception:
-            logging.critical(f'Отсутствие обязательной переменной {var}')
-        if var is None:
-            return False
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
     """Выводит сообщение в бот."""
     try:
-        chat_id = TELEGRAM_CHAT_ID
-        text = message
-        bot.send_message(chat_id, text)
+        bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('Сообщение было корректно отправленно в бот!')
     except Exception:
         logging.error('Бот не смог отправить сообщение')
@@ -64,13 +53,20 @@ def get_api_answer(timestamp):
         logging.error('Сервис недоступен!')
     if api_out.status_code != HTTPStatus.OK:
         raise Exception.EndpointNotOK('Статус отличен от 200 ')
-    return api_out.json()
+    try:
+        if isinstance(api_out.json(), dict):
+            api_out = api_out.json()
+    except TypeError:
+        logging.error('Не валидные данные json()')
+    return api_out
 
 
 def check_response(response):
     """Проверка наличия передоваемых данных с API."""
     if not isinstance(response, dict):
-        raise TypeError('asd')
+        raise TypeError(
+            'Ошибка типа данных "response" не содержит словарь'
+        )
     if 'homeworks' not in response:
         raise KeyError('Нет ключа "homeworks" ')
     if not isinstance(response['homeworks'], list):
@@ -79,6 +75,9 @@ def check_response(response):
         )
     if not response['homeworks']:
         return False
+    # False Указал для того что бы уже в main,
+    # через условия перезапустить цикл и залогировать
+    # Не понимаю как сделать подобное но с raise
     return response['homeworks'][0]
 
 
@@ -89,6 +88,10 @@ def parse_status(homework):
             'Переменная "homework" не содержит ключ "homework_name"'
         )
     homework_name = homework['homework_name']
+    if 'status' not in homework:
+        raise KeyError(
+            'Переменная "status" не содержит ключ "homework_name"'
+        )
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
         raise KeyError('Не известный статус')
@@ -98,15 +101,17 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
+    if not check_tokens():
+        logging.critical('Отсутствие обязательной переменной')
+        return
     new_stats = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
 
     while True:
         try:
-            if check_tokens() is False:
-                break
             get_api = get_api_answer(timestamp)
+            print(get_api)
             response = check_response(get_api)
             if response is False:
                 logging.debug('Список "response" пуст')
