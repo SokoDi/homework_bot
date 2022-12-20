@@ -116,8 +116,8 @@ def main():
                 time.sleep(RETRY_PERIOD)
                 continue
             new_stats = response['status']
-            maseg = parse_status(response)
-            send_message(bot, maseg)
+            new_massage = parse_status(response)
+            send_message(bot, new_massage)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             send_message(bot, message)
