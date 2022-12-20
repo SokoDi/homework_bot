@@ -111,7 +111,6 @@ def main():
     while True:
         try:
             get_api = get_api_answer(timestamp)
-            print(get_api)
             response = check_response(get_api)
             if response is False:
                 logging.debug('Список "response" пуст')
