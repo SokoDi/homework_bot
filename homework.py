@@ -12,19 +12,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler('main.log', 'w', 'utf-8')
+handler.setFormatter(
+    logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+)
+root_logger.addHandler(handler)
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM')
 TELEGRAM_CHAT_ID = os.getenv('CHAT_ID')
 
-# Не совсем понимаю как мне импортировать данную константу.
-# Не могу импортировать PRACTICUM_TOKEN в settings ругаются тесты.
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-# Все остальные победить смог,
-# но лиш при создании доп дериктории и файла __init_.
-# Не знаю на сколько это корректно в рамках ТЗ.
-# По этому мудрить дальше не стал.
 
 
 def check_tokens():
@@ -74,10 +76,15 @@ def check_response(response):
             'Ошибка типа данных "homeworks" не содержит список'
         )
     if not response['homeworks']:
-        return False
-    # False Указал для того что бы уже в main,
-    # через условия перезапустить цикл и залогировать
-    # Не понимаю как сделать подобное но с raise
+        logging.debug('Список "response" пуст')
+        raise ValueError('Список "response" пуст')
+    # Не смог вас найти в пачке по этому тут.
+    # Комы я уберу.
+    # Просто если делать это через raise,
+    # цикл будет отправлят мне сообщения об ошибке в телегу каждую интерацию,
+    # о том что список пуст.
+    # Я хотел этого избежать и получать сообщения лишь при поступлении статуса,
+    # или при крит ошибке, ведь отсутствия инфы о проэкте не ошибка вроде.
     return response['homeworks'][0]
 
 
@@ -112,10 +119,6 @@ def main():
         try:
             get_api = get_api_answer(timestamp)
             response = check_response(get_api)
-            if response is False:
-                logging.debug('Список "response" пуст')
-                time.sleep(RETRY_PERIOD)
-                continue
             if new_stats == response['status']:
                 time.sleep(RETRY_PERIOD)
                 continue
@@ -129,12 +132,4 @@ def main():
 
 
 if __name__ == '__main__':
-    root_logger.setLevel(logging.DEBUG)
-    handler = logging.FileHandler('main.log', 'w', 'utf-8')
-    handler.setFormatter(
-        logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'
-        )
-    )
-    root_logger.addHandler(handler)
     main()
