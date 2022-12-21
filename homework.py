@@ -5,6 +5,7 @@ import os
 import requests
 import logging
 from settings.settings import RETRY_PERIOD, ENDPOINT, HOMEWORK_VERDICTS
+from settings.exceptions import CustomError
 
 from http import HTTPStatus
 from dotenv import load_dotenv
@@ -65,28 +66,23 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Проверка наличия передоваемых данных с API."""
-    if not isinstance(response, dict):
-        raise TypeError(
-            'Ошибка типа данных "response" не содержит словарь'
-        )
-    if 'homeworks' not in response:
-        raise KeyError('Нет ключа "homeworks" ')
-    if not isinstance(response['homeworks'], list):
-        raise TypeError(
-            'Ошибка типа данных "homeworks" не содержит список'
-        )
-    if not response['homeworks']:
-        logging.debug('Список "response" пуст')
-        raise ValueError('Список "response" пуст')
-    # Извеняюсь за такой способ,
-    # просто не смог вас найти в пачке по этому тут.
-    # Комы я уберу.
-    # Просто если делать это через raise,
-    # цикл будет отправлят мне сообщения об ошибке в телегу каждую интерацию,
-    # о том что список пуст.
-    # Я хотел этого избежать и получать сообщения лишь при поступлении статуса,
-    # или при крит ошибке, ведь отсутствия инфы о проекте не ошибка вроде.
-    return response['homeworks'][0]
+    try:
+        return response['homeworks'][0]
+    except CustomError:
+        if not response['homeworks']:
+            logging.debug('Список "response" пуст')
+            raise CustomError('Список "response" пуст')
+    except Exception:
+        if not isinstance(response, dict):
+            raise TypeError(
+                'Ошибка типа данных "response" не содержит словарь'
+            )
+        if 'homeworks' not in response:
+            raise KeyError('Нет ключа "homeworks" ')
+        if not isinstance(response['homeworks'], list):
+            raise TypeError(
+                'Ошибка типа данных "homeworks" не содержит список'
+            )
 
 
 def parse_status(homework):
@@ -120,6 +116,9 @@ def main():
         try:
             get_api = get_api_answer(timestamp)
             response = check_response(get_api)
+            if response is None:
+                time.sleep(RETRY_PERIOD)
+                continue
             if new_stats == response['status']:
                 time.sleep(RETRY_PERIOD)
                 continue
