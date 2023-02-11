@@ -83,7 +83,6 @@ def check_response(response):
             raise TypeError( 
                 'Ошибка типа данных "homeworks" не содержит список' 
             ) 
-    return 
  
 def parse_status(homework): 
     """Оброботка и передача статуса проекта.""" 
